@@ -25,6 +25,8 @@ public class Server {
     private final NameConverter nameConverter;
     private final BeanConverter beanConverter;
 
+    private ServiceCallExceptionHandler serviceCallExceptionHandler;
+
     public Server(ApplicationContext applicationContext,
                   ServiceMapping serviceMapping,
                   NameConverter nameConverter,
@@ -71,8 +73,16 @@ public class Server {
                 logger.info("Register service call {}, [{}].", url, serviceCallDescriptor.getInterceptorDescriptor());
             }
         });
-
         serviceMapping.init(serviceCalls);
+
+        Map<String, ServiceCallExceptionHandler> handlerMap = applicationContext.getBeansOfType(ServiceCallExceptionHandler.class);
+        if (handlerMap.size() > 1) {
+            throw new IllegalStateException("Only one ServiceCallExceptionHandler exists!");
+        }
+        if (handlerMap.size() == 1) {
+            handlerMap.forEach((name, bean) -> serviceCallExceptionHandler = bean);
+        }
+
         logger.info("Spongebob Service startup!");
     }
 
@@ -304,74 +314,84 @@ public class Server {
         @Override
         public Object doService(Request request) {
             Map<Object, Object> requestLocal = null;
-            if ((prefix != null && prefix.length > 0) || (suffix != null && suffix.length > 0)) {
-                requestLocal = new HashMap<>();
-            }
-
-            if (prefix != null) {
-                for (int i = 0; i < prefix.length; i++) {
-                    prefix[i].doIntercept(request, null, requestLocal);
-                }
-            }
-
-            Object result = null;
-
             try {
-                int parameterCount = method.getParameterCount();
-                if (parameterCount == 0) {
-                    result = method.invoke(service);
-                } else {
-                    Request requestProxy = null;
-                    Type[] types = method.getGenericParameterTypes();
-                    Object[] args = new Object[types.length];
-                    for (int i = 0; i < types.length; i++) {
-                        Type type = types[i];
-                        if (Request.class.equals(type)) {
-                            args[i] = request;
-                            continue;
-                        }
-                        if (Session.class.equals(type)) {
-                            args[i] = request.getSession();
-                            continue;
-                        }
-                        if (Client.class.equals(type)) {
-                            args[i] = request.getClient();
-                            continue;
-                        }
-                        if (type instanceof ParameterizedType) {
-                            if (Request.class.equals(((ParameterizedType) type).getRawType())) {
-                                if (requestProxy == null) {
-                                    Object content = request.getContent();
-                                    Object convertedContent = beanConverter.convert(content, ((ParameterizedType) type).getActualTypeArguments()[0]);
-                                    requestProxy = new RequestProxy(request, convertedContent);
-                                }
-                                args[i] = requestProxy;
+                if ((prefix != null && prefix.length > 0) || (suffix != null && suffix.length > 0)) {
+                    requestLocal = new HashMap<>();
+                }
+
+                if (prefix != null) {
+                    for (int i = 0; i < prefix.length; i++) {
+                        prefix[i].doIntercept(request, null, requestLocal);
+                    }
+                }
+
+                Object result = null;
+
+                try {
+                    int parameterCount = method.getParameterCount();
+                    if (parameterCount == 0) {
+                        result = method.invoke(service);
+                    } else {
+                        Request requestProxy = null;
+                        Type[] types = method.getGenericParameterTypes();
+                        Object[] args = new Object[types.length];
+                        for (int i = 0; i < types.length; i++) {
+                            Type type = types[i];
+                            if (Request.class.equals(type)) {
+                                args[i] = request;
                                 continue;
                             }
+                            if (Session.class.equals(type)) {
+                                args[i] = request.getSession();
+                                continue;
+                            }
+                            if (Client.class.equals(type)) {
+                                args[i] = request.getClient();
+                                continue;
+                            }
+                            if (type instanceof ParameterizedType) {
+                                if (Request.class.equals(((ParameterizedType) type).getRawType())) {
+                                    if (requestProxy == null) {
+                                        Object content = request.getContent();
+                                        Object convertedContent = beanConverter.convert(content, ((ParameterizedType) type).getActualTypeArguments()[0]);
+                                        requestProxy = new RequestProxy(request, convertedContent);
+                                    }
+                                    args[i] = requestProxy;
+                                    continue;
+                                }
+                            }
+                            args[i] = Server.this.beanConverter.convert(request.getContent(), type);
                         }
-                        args[i] = Server.this.beanConverter.convert(request.getContent(), type);
+                        result = method.invoke(service, args);
                     }
-                    result = method.invoke(service, args);
+                } catch (InvocationTargetException e) {
+                    if (e.getTargetException() instanceof RuntimeException) {
+                        throw (RuntimeException) e.getTargetException();
+                    }
+                    throw new IllegalStateException(e.getTargetException());
+                } catch (Exception e) {
+                    if (e instanceof RuntimeException) {
+                        throw (RuntimeException) e;
+                    }
+                    throw new IllegalStateException(e);
                 }
-            } catch (InvocationTargetException e) {
-                if (e.getTargetException() instanceof RuntimeException) {
-                    throw (RuntimeException) e.getTargetException();
+
+                if (suffix != null) {
+                    for (int i = 0; i < suffix.length; i++) {
+                        suffix[i].doIntercept(request, result, requestLocal);
+                    }
                 }
-                throw new IllegalStateException(e.getTargetException());
-            } catch (Exception e) {
+
+                return result;
+            } catch (Throwable e) {
+                if (serviceCallExceptionHandler != null) {
+                    return serviceCallExceptionHandler.handle(request, e, requestLocal);
+                }
                 if (e instanceof RuntimeException) {
                     throw (RuntimeException) e;
                 }
                 throw new IllegalStateException(e);
             }
-
-            if (suffix != null) {
-                for (int i = 0; i < suffix.length; i++) {
-                    suffix[i].doIntercept(request, result, requestLocal);
-                }
-            }
-
-            return result;
         }
     }
 
