@@ -8,5 +8,7 @@ import java.lang.reflect.Method;
  */
 public interface NameConverter {
 
-    String toServiceName(String beanName, @Nullable Method method, @Nullable ApiServiceMapping apiServiceMapping);
+    String toServiceName(String beanName, @Nullable ApiServiceMapping apiServiceMapping);
+
+    String toMethodName(Method method, ApiServiceMapping apiServiceMapping);
 }

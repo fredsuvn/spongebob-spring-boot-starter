@@ -1,5 +1,6 @@
 package com.sonluo.spongebob.spring.server;
 
+import javax.annotation.Nullable;
 import java.util.Map;
 
 /**
@@ -7,7 +8,8 @@ import java.util.Map;
  */
 public interface ServiceMapping {
 
+    @Nullable
     ServiceCall getServiceCall(String url);
 
-    void addAll(Map<String, ServiceCall> serviceCalls);
+    void init(Map<String, ServiceCall> serviceCalls);
 }

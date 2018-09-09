@@ -1,5 +1,8 @@
 package com.sonluo.spongebob.spring.server;
 
+import com.sonluo.spongebob.spring.server.impl.DefaultBeanConverter;
+import com.sonluo.spongebob.spring.server.impl.DefaultNameConverter;
+import com.sonluo.spongebob.spring.server.impl.DefaultServiceMapping;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -33,6 +36,13 @@ public class Server {
         this.beanConverter = beanConverter;
     }
 
+    public Server(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
+        this.serviceMapping = new DefaultServiceMapping();
+        this.nameConverter = new DefaultNameConverter();
+        this.beanConverter = DefaultBeanConverter.INSTANCE;
+    }
+
     @Nullable
     public Object doService(Request request) {
         ServiceCall serviceCall = serviceMapping.getServiceCall(request.getUrl());
@@ -55,15 +65,15 @@ public class Server {
                     continue;
                 }
                 ApiServiceMapping apiMapping = method.getDeclaredAnnotation(ApiServiceMapping.class);
-                String url = pathOf(nameConverter.toServiceName(name, null, apiServiceMapping),
-                        nameConverter.toServiceName(name, method, apiMapping));
+                String url = pathOf(nameConverter.toServiceName(name, apiServiceMapping),
+                        nameConverter.toMethodName(method, apiMapping));
                 ServiceCallDescriptor serviceCallDescriptor = createServiceCall(bean, method, apiMapping, groupMap, interceptorMap);
                 serviceCalls.put(url, serviceCallDescriptor.getServiceCall());
                 logger.info("Register service call {}, [{}].", url, serviceCallDescriptor.getInterceptorDescriptor());
             }
         });
 
-        serviceMapping.addAll(serviceCalls);
+        serviceMapping.init(serviceCalls);
         logger.info("Spongebob Service startup!");
     }
 
