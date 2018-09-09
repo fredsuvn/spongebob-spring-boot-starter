@@ -3,7 +3,7 @@ package com.sonluo.spongebob.spring.server;
 /**
  * @author sunqian
  */
-public interface Session extends Properties {
+public interface Session extends ReadOnlyProperties {
 
     String getRemoteAddress();
 

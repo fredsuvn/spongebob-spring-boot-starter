@@ -1,5 +1,7 @@
 package com.sonluo.spongebob.spring.server;
 
+import javax.annotation.Nullable;
+
 /**
  * @author sunqian
  */
@@ -13,5 +15,11 @@ public interface Request<T> {
 
     Client getClient();
 
-    Session getSession();
+    @Nullable
+    default Session getSession() {
+        return getSession(false);
+    }
+
+    @Nullable
+    Session getSession(boolean create);
 }

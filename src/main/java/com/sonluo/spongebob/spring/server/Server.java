@@ -432,9 +432,10 @@ public class Server {
             return original.getClient();
         }
 
+        @Nullable
         @Override
-        public Session getSession() {
-            return original.getSession();
+        public Session getSession(boolean create) {
+            return original.getSession(create);
         }
     }
 }

@@ -2,7 +2,7 @@ package com.sonluo.spongebob.spring.server;
 
 import javax.annotation.Nullable;
 
-public interface Client extends Properties {
+public interface Client extends ReadOnlyProperties {
 
     String getRemoteAddress();
 
