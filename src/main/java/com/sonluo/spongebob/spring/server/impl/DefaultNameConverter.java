@@ -27,4 +27,9 @@ public class DefaultNameConverter implements NameConverter {
         }
         return apiServiceMapping.value();
     }
+
+    @Override
+    public String join(String... names) {
+        return StringUtils.join(names, ".");
+    }
 }

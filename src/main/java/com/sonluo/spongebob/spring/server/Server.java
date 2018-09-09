@@ -25,7 +25,6 @@ public class Server {
     private final NameConverter nameConverter;
     private final BeanConverter beanConverter;
 
-
     public Server(ApplicationContext applicationContext,
                   ServiceMapping serviceMapping,
                   NameConverter nameConverter,
@@ -47,12 +46,12 @@ public class Server {
     public Object doService(Request request) {
         ServiceCall serviceCall = serviceMapping.getServiceCall(request.getUrl());
         if (serviceCall == null) {
-            return null;
+            throw new ServiceNotFoundException();
         }
         return serviceCall.doService(request);
     }
 
-    private void init() {
+    public void init() {
         Map<String, Object> map = applicationContext.getBeansWithAnnotation(ApiService.class);
         Map<String, ServiceCall> serviceCalls = new HashMap<>();
         Map<String, ServiceCallInterceptorGroup> groupMap = findInterceptorGroups();
@@ -65,7 +64,7 @@ public class Server {
                     continue;
                 }
                 ApiServiceMapping apiMapping = method.getDeclaredAnnotation(ApiServiceMapping.class);
-                String url = pathOf(nameConverter.toServiceName(name, apiServiceMapping),
+                String url = nameConverter.join(nameConverter.toServiceName(name, apiServiceMapping),
                         nameConverter.toMethodName(method, apiMapping));
                 ServiceCallDescriptor serviceCallDescriptor = createServiceCall(bean, method, apiMapping, groupMap, interceptorMap);
                 serviceCalls.put(url, serviceCallDescriptor.getServiceCall());
@@ -75,23 +74,6 @@ public class Server {
 
         serviceMapping.init(serviceCalls);
         logger.info("Spongebob Service startup!");
-    }
-
-    private String pathOf(String... paths) {
-        String[] result = new String[paths.length];
-        for (int i = 0; i < paths.length; i++) {
-            String path = paths[i];
-            int begin = 0;
-            int end = path.length();
-            if (path.startsWith("/")) {
-                begin = 1;
-            }
-            if (path.endsWith("/")) {
-                end = path.length() - 1;
-            }
-            result[i] = path.substring(begin, end);
-        }
-        return "/" + StringUtils.join(result, "/");
     }
 
     private ServiceCallDescriptor createServiceCall(Object bean, Method method, ApiServiceMapping apiServiceMapping,
@@ -136,7 +118,7 @@ public class Server {
 
                 @Override
                 public String getInterceptorDescriptor() {
-                    return "interceptor group: " + groupName;
+                    return buildInterceptorDescription(groupName, apiServiceMapping.include(), apiServiceMapping.exclude());
                 }
             };
         }
@@ -165,20 +147,21 @@ public class Server {
 
             @Override
             public String getInterceptorDescriptor() {
-                return "interceptor group: " + groupName
-                        + "(include: " + interceptorArrayToString(prefixRef)
-                        + ", exclude: " + interceptorArrayToString(suffixRef)
-                        + ")";
+                return buildInterceptorDescription(groupName, apiServiceMapping.include(), apiServiceMapping.exclude());
             }
         };
     }
 
-    private String interceptorArrayToString(ServiceCallInterceptor[] array) {
-        String[] names = new String[array.length];
-        for (int i = 0; i < array.length; i++) {
-            names[i] = array[i].getName();
-        }
-        return StringUtils.join(names, ",");
+    private String buildInterceptorDescription(String groupName, @Nullable String[] includes, @Nullable String[] excludes) {
+        StringBuilder description = new StringBuilder();
+        description.append("interceptor group: ");
+        description.append(StringUtils.isEmpty(groupName) ? "[default]" : groupName);
+        description.append("(");
+        description.append(ArrayUtils.isEmpty(includes) ? "includes: []" : "includes: [" + StringUtils.join(includes) + "]");
+        description.append(", ");
+        description.append(ArrayUtils.isEmpty(excludes) ? "excludes: []" : "excludes: [" + StringUtils.join(excludes) + "]");
+        description.append(")");
+        return description.toString();
     }
 
     private Map<String, ServiceCallInterceptorGroup> findInterceptorGroups() {
@@ -325,8 +308,10 @@ public class Server {
                 requestLocal = new HashMap<>();
             }
 
-            for (int i = 0; i < prefix.length; i++) {
-                prefix[i].doIntercept(request, null, requestLocal);
+            if (prefix != null) {
+                for (int i = 0; i < prefix.length; i++) {
+                    prefix[i].doIntercept(request, null, requestLocal);
+                }
             }
 
             Object result = null;
@@ -380,9 +365,12 @@ public class Server {
                 throw new IllegalStateException(e);
             }
 
-            for (int i = 0; i < suffix.length; i++) {
-                suffix[i].doIntercept(request, result, requestLocal);
+            if (suffix != null) {
+                for (int i = 0; i < suffix.length; i++) {
+                    suffix[i].doIntercept(request, result, requestLocal);
+                }
             }
+
             return result;
         }
     }

@@ -11,4 +11,6 @@ public interface NameConverter {
     String toServiceName(String beanName, @Nullable ApiServiceMapping apiServiceMapping);
 
     String toMethodName(Method method, ApiServiceMapping apiServiceMapping);
+
+    String join(String... names);
 }
