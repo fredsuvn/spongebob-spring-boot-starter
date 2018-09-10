@@ -5,15 +5,19 @@ import javax.annotation.Nullable;
 /**
  * @author sunqian
  */
-public interface Request<T> {
+public interface Request<T> extends Attributes{
+
+    @Nullable
+    String getId();
 
     String getUrl();
 
     String getRemoteAddress();
 
-    T getContent();
-
     Client getClient();
+
+    @Nullable
+    T getContent();
 
     @Nullable
     default Session getSession() {

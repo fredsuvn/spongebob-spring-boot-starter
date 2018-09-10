@@ -1,16 +1,16 @@
 package com.sonluo.spongebob.spring.server.impl;
 
 import com.alibaba.fastjson.JSON;
-import com.sonluo.spongebob.spring.server.BeanConverter;
+import com.sonluo.spongebob.spring.server.BeanOperator;
 import org.apache.commons.beanutils.BeanUtils;
 
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 
-public class DefaultBeanConverter implements BeanConverter {
+public class DefaultBeanOperator implements BeanOperator {
 
-    public static final DefaultBeanConverter INSTANCE = new DefaultBeanConverter();
+    public static final DefaultBeanOperator INSTANCE = new DefaultBeanOperator();
 
     @Override
     public <T> T convert(Object src, Type type) {
@@ -26,7 +26,8 @@ public class DefaultBeanConverter implements BeanConverter {
         }
     }
 
-    private <T> T convert(Object src, Class<T> type) {
+    @Override
+    public <T> T convert(Object src, Class<T> type) {
         if (String.class.equals(type)) {
             return (T) String.valueOf(src);
         } else if (int.class.equals(type) || Integer.class.equals(type)) {
@@ -56,6 +57,24 @@ public class DefaultBeanConverter implements BeanConverter {
             } catch (Exception e) {
                 throw new IllegalArgumentException(e);
             }
+        }
+    }
+
+    @Override
+    public Object getProperty(Object obj, String name) {
+        try {
+            return BeanUtils.getProperty(obj, name);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    @Override
+    public void setProperty(Object obj, String name, Object property) {
+        try {
+            BeanUtils.setProperty(obj, name, property);
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
         }
     }
 }

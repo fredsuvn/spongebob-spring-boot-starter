@@ -1,6 +1,6 @@
 package com.sonluo.spongebob.spring.server;
 
-import com.sonluo.spongebob.spring.server.impl.DefaultBeanConverter;
+import com.sonluo.spongebob.spring.server.impl.DefaultBeanOperator;
 import com.sonluo.spongebob.spring.server.impl.DefaultNameConverter;
 import com.sonluo.spongebob.spring.server.impl.DefaultServiceMapping;
 import org.apache.commons.lang3.ArrayUtils;
@@ -8,6 +8,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.DefaultParameterNameDiscoverer;
+import org.springframework.core.ParameterNameDiscoverer;
 
 import javax.annotation.Nullable;
 import java.lang.reflect.*;
@@ -23,25 +25,27 @@ public class Server {
     private final ApplicationContext applicationContext;
     private final ServiceMapping serviceMapping;
     private final NameConverter nameConverter;
-    private final BeanConverter beanConverter;
+    private final BeanOperator beanOperator;
 
-    private ServiceCallExceptionHandler serviceCallExceptionHandler;
+    private ServiceCallExceptionInterceptor serviceCallExceptionInterceptor;
+
+    private ParameterNameDiscoverer parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
 
     public Server(ApplicationContext applicationContext,
                   ServiceMapping serviceMapping,
                   NameConverter nameConverter,
-                  BeanConverter beanConverter) {
+                  BeanOperator beanOperator) {
         this.applicationContext = applicationContext;
         this.serviceMapping = serviceMapping;
         this.nameConverter = nameConverter;
-        this.beanConverter = beanConverter;
+        this.beanOperator = beanOperator;
     }
 
     public Server(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
         this.serviceMapping = new DefaultServiceMapping();
         this.nameConverter = new DefaultNameConverter();
-        this.beanConverter = DefaultBeanConverter.INSTANCE;
+        this.beanOperator = DefaultBeanOperator.INSTANCE;
     }
 
     @Nullable
@@ -75,12 +79,12 @@ public class Server {
         });
         serviceMapping.init(serviceCalls);
 
-        Map<String, ServiceCallExceptionHandler> handlerMap = applicationContext.getBeansOfType(ServiceCallExceptionHandler.class);
+        Map<String, ServiceCallExceptionInterceptor> handlerMap = applicationContext.getBeansOfType(ServiceCallExceptionInterceptor.class);
         if (handlerMap.size() > 1) {
-            throw new IllegalStateException("Only one ServiceCallExceptionHandler exists!");
+            throw new IllegalStateException("Only one ServiceCallExceptionInterceptor exists!");
         }
         if (handlerMap.size() == 1) {
-            handlerMap.forEach((name, bean) -> serviceCallExceptionHandler = bean);
+            handlerMap.forEach((name, bean) -> serviceCallExceptionInterceptor = bean);
         }
 
         logger.info("Spongebob Service startup!");
@@ -333,34 +337,71 @@ public class Server {
                         result = method.invoke(service);
                     } else {
                         Request requestProxy = null;
+                        String[] parameterNames = null;
+                        Object content = null;
+                        boolean gotContent = false;
                         Type[] types = method.getGenericParameterTypes();
                         Object[] args = new Object[types.length];
                         for (int i = 0; i < types.length; i++) {
                             Type type = types[i];
-                            if (Request.class.equals(type)) {
-                                args[i] = request;
-                                continue;
-                            }
-                            if (Session.class.equals(type)) {
-                                args[i] = request.getSession();
-                                continue;
-                            }
-                            if (Client.class.equals(type)) {
-                                args[i] = request.getClient();
-                                continue;
+                            if (type instanceof Class) {
+                                Class cls = (Class) type;
+                                if (!gotContent) {
+                                    content = request.getContent();
+                                }
+                                if (content != null && cls.isAssignableFrom(content.getClass())) {
+                                    args[i] = content;
+                                    continue;
+                                }
+                                if (Request.class.equals(cls)) {
+                                    args[i] = request;
+                                    continue;
+                                }
+                                if (Session.class.equals(cls)) {
+                                    args[i] = request.getSession(true);
+                                    continue;
+                                }
+                                if (Client.class.equals(cls)) {
+                                    args[i] = request.getClient();
+                                    continue;
+                                }
+                                if (isBasicType(cls)) {
+                                    if (content == null) {
+                                        args[i] = null;
+                                    } else {
+                                        if (parameterNames == null) {
+                                            parameterNames = parameterNameDiscoverer.getParameterNames(method);
+                                        }
+                                        String propertyName = parameterNames[i];
+                                        try {
+                                            args[i] = beanOperator.getProperty(content, propertyName);
+                                        } catch (Exception e) {
+                                            args[i] = null;
+                                        }
+                                    }
+                                    continue;
+                                }
                             }
                             if (type instanceof ParameterizedType) {
                                 if (Request.class.equals(((ParameterizedType) type).getRawType())) {
                                     if (requestProxy == null) {
-                                        Object content = request.getContent();
-                                        Object convertedContent = beanConverter.convert(content, ((ParameterizedType) type).getActualTypeArguments()[0]);
-                                        requestProxy = new RequestProxy(request, convertedContent);
+                                        if (!gotContent) {
+                                            content = request.getContent();
+                                        }
+                                        if (content == null) {
+                                            requestProxy = request;
+                                        } else {
+                                            requestProxy = new RequestProxy(
+                                                    request,
+                                                    content,
+                                                    ((ParameterizedType) type).getActualTypeArguments()[0]);
+                                        }
                                     }
                                     args[i] = requestProxy;
                                     continue;
                                 }
                             }
-                            args[i] = Server.this.beanConverter.convert(request.getContent(), type);
+                            args[i] = beanOperator.convert(request.getContent(), type);
                         }
                         result = method.invoke(service, args);
                     }
@@ -384,14 +425,21 @@ public class Server {
 
                 return result;
             } catch (Throwable e) {
-                if (serviceCallExceptionHandler != null) {
-                    return serviceCallExceptionHandler.handle(request, e, requestLocal);
+                if (serviceCallExceptionInterceptor != null) {
+                    return serviceCallExceptionInterceptor.doIntercept(request, e, requestLocal);
                 }
                 if (e instanceof RuntimeException) {
                     throw (RuntimeException) e;
                 }
                 throw new IllegalStateException(e);
             }
+        }
+
+        private boolean isBasicType(Class type) {
+            return String.class.isAssignableFrom(type)
+                    || type.isPrimitive()
+                    || Number.class.isAssignableFrom(type)
+                    || Character.class.isAssignableFrom(type);
         }
     }
 
@@ -407,9 +455,14 @@ public class Server {
         private final Request<T> original;
         private final T content;
 
-        private RequestProxy(Request<T> original, T content) {
+        private RequestProxy(Request<T> original, T content, Type type) {
             this.original = original;
-            this.content = content;
+            this.content = beanOperator.convert(content, type);
+        }
+
+        @Override
+        public String getId() {
+            return original.getId();
         }
 
         @Override
@@ -436,6 +489,27 @@ public class Server {
         @Override
         public Session getSession(boolean create) {
             return original.getSession(create);
+        }
+
+        @Nullable
+        @Override
+        public Object getAttribute(String name) {
+            return original.getAttribute(name);
+        }
+
+        @Override
+        public void setAttribute(String name, Object attribute) {
+            original.setAttribute(name, attribute);
+        }
+
+        @Override
+        public void removeAttribute(String name) {
+            original.removeAttribute(name);
+        }
+
+        @Override
+        public Map<String, Object> getAttributes() {
+            return original.getAttributes();
         }
     }
 }

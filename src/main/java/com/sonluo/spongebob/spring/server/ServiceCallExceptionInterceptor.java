@@ -5,9 +5,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.Map;
 
-public interface ServiceCallExceptionHandler {
+public interface ServiceCallExceptionInterceptor {
 
     Logger logger = LoggerFactory.getLogger(ServiceCallInterceptor.class);
 
-    Object handle(Request request, Throwable throwable, Map<Object, Object> requestLocal);
+    Object doIntercept(Request request, Throwable throwable, Map<Object, Object> requestLocal);
 }
