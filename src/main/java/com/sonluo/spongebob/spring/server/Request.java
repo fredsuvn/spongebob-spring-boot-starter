@@ -5,10 +5,12 @@ import javax.annotation.Nullable;
 /**
  * @author sunqian
  */
-public interface Request<T> extends Attributes{
+public interface Request<T> extends Attributes {
 
     @Nullable
     String getId();
+
+    String getProtocol();
 
     String getUrl();
 

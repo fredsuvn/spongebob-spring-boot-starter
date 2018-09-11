@@ -365,6 +365,15 @@ public class Server {
                                     args[i] = request.getClient();
                                     continue;
                                 }
+                                if (Channel.class.equals(cls)) {
+                                    Session session = request.getSession(true);
+                                    if (session == null) {
+                                        args[i] = null;
+                                    } else {
+                                        args[i] = session.getDefaultChannel();
+                                    }
+                                    continue;
+                                }
                                 if (isBasicType(cls)) {
                                     if (content == null) {
                                         args[i] = null;
@@ -463,6 +472,11 @@ public class Server {
         @Override
         public String getId() {
             return original.getId();
+        }
+
+        @Override
+        public String getProtocol() {
+            return original.getProtocol();
         }
 
         @Override

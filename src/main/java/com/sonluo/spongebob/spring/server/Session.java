@@ -1,5 +1,7 @@
 package com.sonluo.spongebob.spring.server;
 
+import java.util.Collection;
+
 /**
  * @author sunqian
  */
@@ -7,15 +9,21 @@ public interface Session extends Attributes {
 
     String getId();
 
-//    String getRemoteAddress();
+    String getProtocol();
 
-//    Client getClient();
+    long getLastAccessTime();
 
-    boolean canPush();
+    long getLastActiveTime();
 
-    void push(Object message);
+    boolean isAlive();
 
     void close();
 
-    void onDestroy(Runnable action);
+    Channel getDefaultChannel();
+
+    Channel getChannel(String channelId);
+
+    Collection<Channel> getAllChannels();
+
+    Channel createNewChannel(String channelId);
 }

@@ -4,15 +4,15 @@ import com.sonluo.spongebob.spring.server.Attributes;
 
 import javax.annotation.Nullable;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author sunqian
  */
 public class DefaultAttributes implements Attributes {
 
-    private final Map<String, Object> attributes = new HashMap<>();
+    private final Map<String, Object> attributes = new ConcurrentHashMap<>();
 
     @Nullable
     @Override
