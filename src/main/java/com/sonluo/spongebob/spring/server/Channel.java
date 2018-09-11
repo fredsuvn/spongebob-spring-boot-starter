@@ -4,9 +4,11 @@ public interface Channel {
 
     String getId();
 
-    long createTime();
+    boolean isOpen();
 
     boolean canPush();
 
     void push(Object message);
+
+    void close();
 }

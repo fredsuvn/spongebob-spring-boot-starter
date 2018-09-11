@@ -20,8 +20,6 @@ public interface Session extends Attributes {
 
     boolean isAlive();
 
-    void beat();
-
     void close();
 
     Channel getDefaultChannel();
