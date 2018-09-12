@@ -52,6 +52,9 @@ public class Server {
     public Object doService(Request request) {
         ServiceCall serviceCall = serviceMapping.getServiceCall(request.getUrl());
         if (serviceCall == null) {
+            if (serviceCallExceptionInterceptor != null) {
+                return serviceCallExceptionInterceptor.doIntercept(request, new ServiceNotFoundException(), new HashMap<>());
+            }
             throw new ServiceNotFoundException();
         }
         return serviceCall.doService(request);

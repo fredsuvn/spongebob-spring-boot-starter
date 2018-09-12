@@ -30,6 +30,5 @@ public class InvalidChannel implements Channel {
 
     @Override
     public void close() {
-        throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 }

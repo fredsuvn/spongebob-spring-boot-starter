@@ -4,7 +4,6 @@ import com.sonluo.spongebob.spring.server.Channel;
 import com.sonluo.spongebob.spring.server.Session;
 
 import javax.annotation.Nullable;
-import java.util.Collection;
 import java.util.Map;
 
 public class InvalidSession implements Session {
@@ -39,13 +38,12 @@ public class InvalidSession implements Session {
     }
 
     @Override
-    public boolean isAlive() {
+    public boolean isOpen() {
         return false;
     }
 
     @Override
     public void close() {
-        throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 
     @Override
@@ -65,12 +63,17 @@ public class InvalidSession implements Session {
     }
 
     @Override
-    public Collection<Channel> getAllChannels() {
+    public Map<String, Channel> getAllChannels() {
         throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 
     @Override
     public Channel createNewChannel(String channelId) {
+        throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
+    }
+
+    @Override
+    public Channel getOrCreateChannel(String channelId) {
         throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 

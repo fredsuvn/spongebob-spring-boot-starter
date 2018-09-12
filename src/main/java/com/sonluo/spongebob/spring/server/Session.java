@@ -1,7 +1,7 @@
 package com.sonluo.spongebob.spring.server;
 
 import javax.annotation.Nullable;
-import java.util.Collection;
+import java.util.Map;
 
 /**
  * @author sunqian
@@ -18,7 +18,7 @@ public interface Session extends Attributes {
 
     long getLastActiveTime();
 
-    boolean isAlive();
+    boolean isOpen();
 
     void close();
 
@@ -29,7 +29,15 @@ public interface Session extends Attributes {
     @Nullable
     Channel getChannel(String channelId);
 
-    Collection<Channel> getAllChannels();
+    Map<String, Channel> getAllChannels();
 
     Channel createNewChannel(String channelId);
+
+    default Channel getOrCreateChannel(String channelId) {
+        Channel channel = getChannel(channelId);
+        if (channel != null) {
+            return channel;
+        }
+        return createNewChannel(channelId);
+    }
 }
