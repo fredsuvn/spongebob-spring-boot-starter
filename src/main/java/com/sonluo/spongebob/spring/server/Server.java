@@ -413,7 +413,11 @@ public class Server {
                                     continue;
                                 }
                             }
-                            args[i] = beanOperator.convert(request.getContent(), type);
+                            if (content == null) {
+                                args[i] = null;
+                            } else {
+                                args[i] = beanOperator.convert(content, type);
+                            }
                         }
                         result = method.invoke(service, args);
                     }
