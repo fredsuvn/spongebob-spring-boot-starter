@@ -14,6 +14,9 @@ public class DefaultBeanOperator implements BeanOperator {
 
     @Override
     public <T> T convert(Object src, Type type) {
+        if (src.getClass().equals(type)) {
+            return (T) src;
+        }
         if (type instanceof Class) {
             return convert(src, (Class<T>) type);
         } else {
@@ -28,6 +31,9 @@ public class DefaultBeanOperator implements BeanOperator {
 
     @Override
     public <T> T convert(Object src, Class<T> type) {
+        if (src.getClass().equals(type)) {
+            return (T) src;
+        }
         if (String.class.equals(type)) {
             return (T) String.valueOf(src);
         } else if (int.class.equals(type) || Integer.class.equals(type)) {
