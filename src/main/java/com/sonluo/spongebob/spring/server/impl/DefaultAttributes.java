@@ -12,26 +12,26 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class DefaultAttributes implements Attributes {
 
-    private final Map<String, Object> attributes = new ConcurrentHashMap<>();
+    private final Map<Object, Object> attributes = new ConcurrentHashMap<>();
 
     @Nullable
     @Override
-    public Object getAttribute(String name) {
-        return attributes.get(name);
+    public Object getAttribute(Object key) {
+        return attributes.get(key);
     }
 
     @Override
-    public void setAttribute(String name, Object attribute) {
-        attributes.put(name, attribute);
+    public void setAttribute(Object key, Object attribute) {
+        attributes.put(key, attribute);
     }
 
     @Override
-    public void removeAttribute(String name) {
-        attributes.remove(name);
+    public void removeAttribute(Object key) {
+        attributes.remove(key);
     }
 
     @Override
-    public Map<String, Object> getAttributes() {
+    public Map<Object, Object> getAttributes() {
         return Collections.unmodifiableMap(attributes);
     }
 }

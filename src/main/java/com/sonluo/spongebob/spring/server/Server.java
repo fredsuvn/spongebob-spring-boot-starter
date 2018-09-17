@@ -53,7 +53,7 @@ public class Server {
         ServiceCall serviceCall = serviceMapping.getServiceCall(request.getUrl());
         if (serviceCall == null) {
             if (serviceCallExceptionInterceptor != null) {
-                return serviceCallExceptionInterceptor.doIntercept(request, new ServiceNotFoundException(), new HashMap<>());
+                return serviceCallExceptionInterceptor.doServiceNotFound(request);
             }
             throw new ServiceNotFoundException();
         }
@@ -115,7 +115,7 @@ public class Server {
             }
         }
         if (ArrayUtils.isNotEmpty(apiServiceMapping.exclude())) {
-            String[] excludes = apiServiceMapping.include();
+            String[] excludes = apiServiceMapping.exclude();
             for (int i = 0; i < excludes.length; i++) {
                 ServiceCallInterceptor interceptor = interceptorMap.get(excludes[i]);
                 if (interceptor == null) {
@@ -290,8 +290,8 @@ public class Server {
         }
 
         @Override
-        public void doIntercept(Request request, @Nullable Object result, Map<Object, Object> ext) {
-            interceptor.doIntercept(request, result, ext);
+        public void doIntercept(Request request, Object[] args, @Nullable Object result, Map<Object, Object> ext) {
+            interceptor.doIntercept(request, args, result, ext);
         }
 
         @Override
@@ -321,141 +321,148 @@ public class Server {
         @Override
         public Object doService(Request request) {
             Map<Object, Object> requestLocal = null;
+//            try {
+            Object result = null;
+
             try {
-                if ((prefix != null && prefix.length > 0) || (suffix != null && suffix.length > 0)) {
-                    requestLocal = new HashMap<>();
-                }
-
-                if (prefix != null) {
-                    for (int i = 0; i < prefix.length; i++) {
-                        prefix[i].doIntercept(request, null, requestLocal);
-                    }
-                }
-
-                Object result = null;
-
-                try {
-                    int parameterCount = method.getParameterCount();
-                    if (parameterCount == 0) {
-                        result = method.invoke(service);
-                    } else {
-                        Request requestProxy = null;
-                        String[] parameterNames = null;
-                        Object content = null;
-                        boolean gotContent = false;
-                        Type[] types = method.getGenericParameterTypes();
-                        Object[] args = new Object[types.length];
-                        for (int i = 0; i < types.length; i++) {
-                            Type type = types[i];
-                            if (type instanceof Class) {
-                                Class cls = (Class) type;
-                                if (!gotContent) {
-                                    content = request.getContent();
-                                }
-                                if (content != null && cls.isAssignableFrom(content.getClass())) {
-                                    args[i] = content;
-                                    continue;
-                                }
-                                if (Request.class.equals(cls)) {
-                                    args[i] = request;
-                                    continue;
-                                }
-                                if (Session.class.equals(cls)) {
-                                    args[i] = request.getSession(true);
-                                    continue;
-                                }
-                                if (Client.class.equals(cls)) {
-                                    args[i] = request.getClient();
-                                    continue;
-                                }
-                                if (Channel.class.equals(cls)) {
-                                    Session session = request.getSession(true);
-                                    if (session == null) {
-                                        args[i] = null;
-                                    } else {
-                                        args[i] = session.getDefaultChannel();
-                                    }
-                                    continue;
-                                }
-                                if (isBasicType(cls)) {
-                                    if (content == null) {
-                                        args[i] = null;
-                                    } else {
-                                        if (parameterNames == null) {
-                                            parameterNames = parameterNameDiscoverer.getParameterNames(method);
-                                        }
-                                        String propertyName = parameterNames[i];
-                                        try {
-                                            args[i] = beanOperator.getProperty(content, propertyName);
-                                        } catch (Exception e) {
-                                            args[i] = null;
-                                        }
-                                    }
-                                    continue;
-                                }
+                int parameterCount = method.getParameterCount();
+                if (parameterCount == 0) {
+                    result = callServiceChains(request, ArrayUtils.EMPTY_OBJECT_ARRAY);
+                } else {
+                    Request requestProxy = null;
+                    String[] parameterNames = null;
+                    Object content = null;
+                    boolean gotContent = false;
+                    Type[] types = method.getGenericParameterTypes();
+                    Object[] args = new Object[types.length];
+                    for (int i = 0; i < types.length; i++) {
+                        Type type = types[i];
+                        if (type instanceof Class) {
+                            Class cls = (Class) type;
+                            if (!gotContent) {
+                                content = request.getContent();
                             }
-                            if (type instanceof ParameterizedType) {
-                                if (Request.class.equals(((ParameterizedType) type).getRawType())) {
-                                    if (requestProxy == null) {
-                                        if (!gotContent) {
-                                            content = request.getContent();
-                                        }
-                                        if (content == null) {
-                                            requestProxy = request;
-                                        } else {
-                                            requestProxy = new RequestProxy(
-                                                    request,
-                                                    content,
-                                                    ((ParameterizedType) type).getActualTypeArguments()[0]);
-                                        }
-                                    }
-                                    args[i] = requestProxy;
-                                    continue;
-                                }
+                            if (content != null && cls.isAssignableFrom(content.getClass())) {
+                                args[i] = content;
+                                continue;
                             }
-                            if (content == null) {
-                                args[i] = null;
-                            } else {
-                                args[i] = beanOperator.convert(content, type);
+                            if (Request.class.equals(cls)) {
+                                args[i] = request;
+                                continue;
+                            }
+                            if (Session.class.equals(cls)) {
+                                args[i] = request.getSession(true);
+                                continue;
+                            }
+                            if (Client.class.equals(cls)) {
+                                args[i] = request.getClient();
+                                continue;
+                            }
+                            if (Channel.class.equals(cls)) {
+                                Session session = request.getSession(true);
+                                if (session == null) {
+                                    args[i] = null;
+                                } else {
+                                    args[i] = session.getDefaultChannel();
+                                }
+                                continue;
+                            }
+                            if (beanOperator.isBasicType(cls)) {
+                                if (content == null) {
+                                    args[i] = null;
+                                } else {
+                                    if (parameterNames == null) {
+                                        parameterNames = parameterNameDiscoverer.getParameterNames(method);
+                                    }
+                                    String propertyName = parameterNames[i];
+                                    try {
+                                        args[i] = beanOperator.getProperty(content, propertyName);
+                                    } catch (Exception e) {
+                                        args[i] = null;
+                                    }
+                                }
+                                continue;
                             }
                         }
-                        result = method.invoke(service, args);
+                        if (type instanceof ParameterizedType) {
+                            if (Request.class.equals(((ParameterizedType) type).getRawType())) {
+                                if (requestProxy == null) {
+                                    if (!gotContent) {
+                                        content = request.getContent();
+                                    }
+                                    if (content == null) {
+                                        requestProxy = request;
+                                    } else {
+                                        requestProxy = new RequestProxy(
+                                                request,
+                                                content,
+                                                ((ParameterizedType) type).getActualTypeArguments()[0]);
+                                    }
+                                }
+                                args[i] = requestProxy;
+                                continue;
+                            }
+                        }
+                        if (content == null) {
+                            args[i] = null;
+                        } else {
+                            args[i] = beanOperator.convert(content, type);
+                        }
                     }
-                } catch (InvocationTargetException e) {
-                    if (e.getTargetException() instanceof RuntimeException) {
-                        throw (RuntimeException) e.getTargetException();
-                    }
-                    throw new IllegalStateException(e.getTargetException());
-                } catch (Exception e) {
-                    if (e instanceof RuntimeException) {
-                        throw (RuntimeException) e;
-                    }
-                    throw new IllegalStateException(e);
+                    result = callServiceChains(request, args);
                 }
-
-                if (suffix != null) {
-                    for (int i = 0; i < suffix.length; i++) {
-                        suffix[i].doIntercept(request, result, requestLocal);
-                    }
-                }
-
-                return result;
-            } catch (Throwable e) {
-                if (serviceCallExceptionInterceptor != null) {
-                    return serviceCallExceptionInterceptor.doIntercept(request, e, requestLocal);
-                }
+            } catch (Exception e) {
                 if (e instanceof RuntimeException) {
                     throw (RuntimeException) e;
                 }
                 throw new IllegalStateException(e);
             }
+
+            return result;
+//            } catch (Throwable e) {
+//                if (serviceCallExceptionInterceptor != null) {
+//                    return serviceCallExceptionInterceptor.doIntercept(request, e, requestLocal);
+//                }
+//                if (e instanceof RuntimeException) {
+//                    throw (RuntimeException) e;
+//                }
+//                throw new IllegalStateException(e);
+//            }
         }
 
-        private boolean isBasicType(Class type) {
-            return String.class.isAssignableFrom(type)
-                    || type.isPrimitive()
-                    || Number.class.isAssignableFrom(type)
-                    || Character.class.isAssignableFrom(type);
+        private Object callServiceChains(Request request, Object[] args) {
+            Map<Object, Object> requestLocal = new HashMap<>();
+            try {
+//                if ((prefix != null && prefix.length > 0) || (suffix != null && suffix.length > 0)) {
+//                    requestLocal = new HashMap<>();
+//                }
+
+                if (prefix != null) {
+                    for (int i = 0; i < prefix.length; i++) {
+                        prefix[i].doIntercept(request, args, null, requestLocal);
+                    }
+                }
+
+                Object result = method.invoke(service, args);
+
+                if (suffix != null) {
+                    for (int i = 0; i < suffix.length; i++) {
+                        suffix[i].doIntercept(request, args, result, requestLocal);
+                    }
+                }
+
+                return result;
+            } catch (InvocationTargetException e) {
+                if (serviceCallExceptionInterceptor != null) {
+                    return serviceCallExceptionInterceptor.doIntercept(request, args, e.getTargetException(), requestLocal);
+                }
+                throw new IllegalStateException(e);
+            } catch (Exception e) {
+                if (serviceCallExceptionInterceptor != null) {
+                    return serviceCallExceptionInterceptor.doIntercept(request, args, e, requestLocal);
+                }
+                throw new IllegalStateException(e);
+            }
         }
     }
 
@@ -514,22 +521,22 @@ public class Server {
 
         @Nullable
         @Override
-        public Object getAttribute(String name) {
-            return original.getAttribute(name);
+        public Object getAttribute(Object key) {
+            return original.getAttribute(key);
         }
 
         @Override
-        public void setAttribute(String name, Object attribute) {
-            original.setAttribute(name, attribute);
+        public void setAttribute(Object key, Object attribute) {
+            original.setAttribute(key, attribute);
         }
 
         @Override
-        public void removeAttribute(String name) {
-            original.removeAttribute(name);
+        public void removeAttribute(Object key) {
+            original.removeAttribute(key);
         }
 
         @Override
-        public Map<String, Object> getAttributes() {
+        public Map<Object, Object> getAttributes() {
             return original.getAttributes();
         }
     }

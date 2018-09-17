@@ -85,34 +85,34 @@ public class SessionUtils {
 
             @Override
             @Nullable
-            public synchronized Object getAttribute(String name) {
+            public synchronized Object getAttribute(Object name) {
                 return proxy.getAttribute(name);
             }
 
             @Override
             @Nullable
-            public synchronized <T> T getAttribute(String name, Class<T> type) {
-                return proxy.getAttribute(name, type);
+            public synchronized <T> T getAttribute(Object key, Class<T> type) {
+                return proxy.getAttribute(key, type);
             }
 
             @Override
             @Nullable
-            public synchronized <T> T getAttribute(String name, Type type) {
-                return proxy.getAttribute(name, type);
+            public synchronized <T> T getAttribute(Object key, Type type) {
+                return proxy.getAttribute(key, type);
             }
 
             @Override
-            public synchronized void setAttribute(String name, Object attribute) {
-                proxy.setAttribute(name, attribute);
+            public synchronized void setAttribute(Object key, Object attribute) {
+                proxy.setAttribute(key, attribute);
             }
 
             @Override
-            public synchronized void removeAttribute(String name) {
-                proxy.removeAttribute(name);
+            public synchronized void removeAttribute(Object key) {
+                proxy.removeAttribute(key);
             }
 
             @Override
-            public synchronized Map<String, Object> getAttributes() {
+            public synchronized Map<Object, Object> getAttributes() {
                 return proxy.getAttributes();
             }
         };

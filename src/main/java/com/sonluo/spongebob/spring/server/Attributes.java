@@ -9,11 +9,11 @@ import java.util.Map;
 public interface Attributes {
 
     @Nullable
-    Object getAttribute(String name);
+    Object getAttribute(Object key);
 
     @Nullable
-    default <T> T getAttribute(String name, Class<T> type) {
-        Object src = getAttribute(name);
+    default <T> T getAttribute(Object key, Class<T> type) {
+        Object src = getAttribute(key);
         if (src == null) {
             return null;
         }
@@ -21,17 +21,17 @@ public interface Attributes {
     }
 
     @Nullable
-    default <T> T getAttribute(String name, Type type) {
-        Object src = getAttribute(name);
+    default <T> T getAttribute(Object key, Type type) {
+        Object src = getAttribute(key);
         if (src == null) {
             return null;
         }
         return DefaultBeanOperator.INSTANCE.convert(src, type);
     }
 
-    void setAttribute(String name, Object attribute);
+    void setAttribute(Object key, Object attribute);
 
-    void removeAttribute(String name);
+    void removeAttribute(Object key);
 
-    Map<String, Object> getAttributes();
+    Map<Object, Object> getAttributes();
 }

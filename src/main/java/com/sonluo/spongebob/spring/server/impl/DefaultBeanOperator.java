@@ -83,4 +83,12 @@ public class DefaultBeanOperator implements BeanOperator {
             throw new IllegalStateException(e);
         }
     }
+
+    @Override
+    public boolean isBasicType(Class type) {
+        return String.class.isAssignableFrom(type)
+                || type.isPrimitive()
+                || Number.class.isAssignableFrom(type)
+                || Character.class.isAssignableFrom(type);
+    }
 }

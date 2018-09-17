@@ -79,22 +79,22 @@ public class InvalidSession implements Session {
 
     @Nullable
     @Override
-    public Object getAttribute(String name) {
+    public Object getAttribute(Object key) {
         throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 
     @Override
-    public void setAttribute(String name, Object attribute) {
+    public void setAttribute(Object key, Object attribute) {
         throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 
     @Override
-    public void removeAttribute(String name) {
+    public void removeAttribute(Object key) {
         throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 
     @Override
-    public Map<String, Object> getAttributes() {
+    public Map<Object, Object> getAttributes() {
         throw new IllegalStateException(ILLEGAL_STATE_MESSAGE);
     }
 }
