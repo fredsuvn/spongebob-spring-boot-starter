@@ -21,4 +21,8 @@ public interface ServiceCallInterceptor {
     default String getName() {
         return null;
     }
+
+    default boolean joinDefaultGroup() {
+        return true;
+    }
 }
